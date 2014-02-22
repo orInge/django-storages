@@ -112,7 +112,7 @@ def _parse_datestring(dstr):
         datedict = m.groupdict()
         utc_datetime = datetime(
             int(datedict['year']),
-            int(MONTH_NAMES.index(datedict['month_name'])) + 1,
+            int(datedict['month']),
             int(datedict['day']),
             int(datedict['hour']),
             int(datedict['minute']),
