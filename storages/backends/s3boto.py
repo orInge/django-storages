@@ -87,11 +87,17 @@ def safe_join(base, *paths):
 
     return final_path.lstrip('/')
 
-# Dates returned from S3's API look something like this:
-# "Sun, 11 Mar 2012 17:01:41 GMT"
 MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-DATESTR_RE = re.compile(r"^.+, (?P<day>\d{1,2}) (?P<month_name>%s) (?P<year>\d{4}) (?P<hour>\d{1,2}):(?P<minute>\d{1,2}):(?P<second>\d{1,2}) (GMT|UTC)$" % ("|".join(MONTH_NAMES)))
+
+# Dates returned from S3's API look something like this:
+# "Sun, 11 Mar 2012 17:01:41 GMT"
+# DATESTR_RE = re.compile(r"^.+, (?P<day>\d{1,2}) (?P<month_name>%s) (?P<year>\d{4}) (?P<hour>\d{1,2}):(?P<minute>\d{1,2}):(?P<second>\d{1,2}) (GMT|UTC)$" % ("|".join(MONTH_NAMES)))
+
+# Dates returned from S3's API look something like this:
+# 2014-02-22T06:34:26.000Z
+DATESTR_RE = re.compile(r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})T(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2}).+$")
+
 def _parse_datestring(dstr):
     """
     Parse a simple datestring returned by the S3 API and returns
@@ -332,7 +338,8 @@ class S3BotoStorage(Storage):
             entry = self.bucket.get_key(self._encode_name(name))
         if not entry.last_modified:
             try:
-                entry.last_modified = datetime.datetime.now().strftime('%a, %d %b %Y %H:%M:%S ' + 'UTC')
+                # 2014-02-22T06:34:26.000Z
+                entry.last_modified = datetime.now().strftime('%Y-%m-%dT%H:%M:%S.000Z')               
             except ValueError:
                 pass
         # Parse the last_modified string to a local datetime object.
