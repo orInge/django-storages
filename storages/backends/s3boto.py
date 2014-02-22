@@ -330,7 +330,11 @@ class S3BotoStorage(Storage):
         entry = self.entries.get(name)
         if entry is None:
             entry = self.bucket.get_key(self._encode_name(name))
-
+        if not entry.last_modified:
+            try:
+                entry.last_modified = datetime.datetime.now().strftime('%a, %d %b %Y %H:%M:%S ' + 'UTC')
+            except ValueError:
+                pass
         # Parse the last_modified string to a local datetime object.
         return _parse_datestring(entry.last_modified)
 
