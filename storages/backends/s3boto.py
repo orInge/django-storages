@@ -87,33 +87,35 @@ def safe_join(base, *paths):
 
     return final_path.lstrip('/')
 
-# Dates returned from S3's API look something like this:
-# "Sun, 11 Mar 2012 17:01:41 GMT"
 MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-DATESTR_RE = re.compile(r"^.+, (?P<day>\d{1,2}) (?P<month_name>%s) (?P<year>\d{4}) (?P<hour>\d{1,2}):(?P<minute>\d{1,2}):(?P<second>\d{1,2}) (GMT|UTC)$" % ("|".join(MONTH_NAMES)))
+# ISO8601 Extended # Sun, 11 Mar 2012 17:01:41 GMT
+DATESTR_EXTENDED_RE = re.compile(r"^.+, (?P<day>\d{1,2}) (?P<month_name>%s) (?P<year>\d{4}) (?P<hour>\d{1,2}):(?P<minute>\d{1,2}):(?P<second>\d{1,2}) (GMT|UTC)$" % ("|".join(MONTH_NAMES)))
+# ISO8601 Basic # 2014-02-22T06:34:26.000Z
+DATESTR_BASIC_RE = re.compile(r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})T(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2}).+$")
+
 def _parse_datestring(dstr):
     """
-    Parse a simple datestring returned by the S3 API and returns
-    a datetime object in the local timezone.
+    Parse a simple datestring returned by S3 API and return
+    a datetime object in local timezone.
+    Assumes datestring is formatted ISO8601 Extended or Basic
     """
-    # This regular expression and thus this function
-    # assumes the date is GMT/UTC
-    m = DATESTR_RE.match(dstr)
+    m = DATESTR_BASIC_RE.match(dstr) or DATESTR_EXTENDED_RE.match(dstr)
     if m:
-        # This code could raise a ValueError if there is some
-        # bad data or the date is invalid.
         datedict = m.groupdict()
+        if datedict.has_key('month_name'):
+            month = int(MONTH_NAMES.index(datedict['month_name'])) + 1
+        else:
+            month = int(datedict['month'])
         utc_datetime = datetime(
             int(datedict['year']),
-            int(MONTH_NAMES.index(datedict['month_name'])) + 1,
+            month,
             int(datedict['day']),
             int(datedict['hour']),
             int(datedict['minute']),
             int(datedict['second']),
         )
-
-        # Convert the UTC datetime object to local time.
+        # Convert to local time.
         return datetime(*time.localtime(calendar.timegm(utc_datetime.timetuple()))[:6])
     else:
         raise ValueError("Could not parse date string: " + dstr)
@@ -331,10 +333,7 @@ class S3BotoStorage(Storage):
         if entry is None:
             entry = self.bucket.get_key(self._encode_name(name))
         if not entry.last_modified:
-            try:
-                entry.last_modified = datetime.datetime.now().strftime('%a, %d %b %Y %H:%M:%S ' + 'UTC')
-            except ValueError:
-                pass
+            entry.last_modified = datetime.now().strftime('%Y-%m-%dT%H:%M:%S.000Z')
         # Parse the last_modified string to a local datetime object.
         return _parse_datestring(entry.last_modified)
 
